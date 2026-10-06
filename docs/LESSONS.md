@@ -98,4 +98,5 @@
 - D6. 화면이 잠긴 동안 `tests/shots.py`가 잠금 화면을 찍고도 "saved"라고 함(D1 재발) → 찍기 전에 `WindowFromPoint` 클래스가 `LockScreenBackstopFrame`이면 종료 코드 3으로 멈추게 함
 - D7. exe 연기 시험에서 `Start-Process`로 받은 PID의 창 제목이 비어 있었고, 그 PID를 끝냈는데 창이 남음 → onefile exe는 압축을 푸는 부모와 창을 띄우는 자식, 두 프로세스다. 확인은 `Get-Process photo-organizer`로 이름·시작 시각을 보고, 내가 띄운 시각 이후의 것만 닫는다
 - D8. 창 모드 exe는 콘솔이 없어 CLI 인자를 줘도 창이 열림 → 얼린 exe 안의 작업 프로세스(HEIC 변환) 확인은 같은 코드로 `--console` 빌드를 `build\console-check`에 따로 만들어 CLI로 돌리고 지운다(5장 변환·되돌리기 정상, 남은 프로세스 0)
+- D9. 다른 저장소에서 파일을 복사해 쓸 때 내용을 읽지 않음: 음악 툴의 `LICENSE`에는 이 프로젝트에 없는 `fpcalc.exe`(Chromaprint) 안내가 붙어 있었음. 그대로 올렸다가 GitHub가 MIT로 인식하지 못하고 "Other"로 표시해 발견(음악 툴 두 저장소도 같은 표시) → 표준 MIT 본문으로 교체. 규칙: **복사한 파일은 쓰기 전에 읽고, 그 프로젝트에 맞는지 확인한다. 공개 저장소는 올린 뒤 `gh repo view --json licenseInfo,repositoryTopics`로 인식 결과를 확인한다**
 - D4. 성능 시험 데이터가 모든 파일을 같은 크기로 만들어 "완전 중복 찾기 9.5초(중복 0개)"로 보임 → 실제 원인(파일 열기 비용 약 1ms/개)은 맞았지만, 측정 데이터가 현실과 다르다는 점을 같이 적어 둔다. 스캔에서 한 번 열 때 앞 64KB 해시를 만들어 두어 해결(9.5초 → 0.008초)
