@@ -456,6 +456,29 @@ def _claim(item: Item, folder: str, stem: str, ctx: _Ctx) -> None:
         item.convert_dst = os.path.join(folder, stem + ".jpg")
 
 
+_OWN_NUMBER = re.compile(r" \((\d+)\)$")
+
+
+def _in_place_already(item: Item, folder: str, stem: str, ctx: _Ctx) -> bool:
+    """The file already sits in the target folder under a name this run could give it: the fitted
+    stem itself or "stem (n)" from an earlier run. Then that name is its place, whatever the
+    per-name counter says. The counter resumes numbering where the last file with this name
+    stopped, so once long names are cut to one shared stem the numbered files (sorted first)
+    push it past the plain file's own slot and the plain file was renamed to "(4)" on every run
+    (LESSONS A17). Short names never shared a stem, which hid this."""
+    if key_of(item.primary.folder) != key_of(folder):
+        return False
+    own = item.primary.stem
+    base = _OWN_NUMBER.sub("", own)
+    if base != stem or not _free(item, folder, own, ctx):
+        return False
+    _claim(item, folder, own, ctx)
+    item.dsts = [m.path for m in item.members]
+    if item.status == CONFLICT:
+        item.status = SAME
+    return True
+
+
 def _place(item: Item, ctx: _Ctx) -> None:
     """Set the item's targets. A second run stays quiet without any special pass: the
     target name comes from the file's own name ("x (2).jpg" aims at "x (2).jpg"), a file
@@ -490,6 +513,8 @@ def _place(item: Item, ctx: _Ctx) -> None:
                 return
             folder = os.path.join(base, opts.dupes_name)
             stem, item.truncated = fit_stem(folder, item.primary.stem, _member_names(item, ""))
+    if _in_place_already(item, folder, stem, ctx):
+        return
     name_key = _tkey(os.path.join(folder, stem))
     n = ctx.counters.get(name_key, 1)
     candidate = stem if n == 1 else f"{stem} ({n})"
