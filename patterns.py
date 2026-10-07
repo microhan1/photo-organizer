@@ -107,8 +107,28 @@ def _to_date(m: re.Match, years: tuple[int, int]) -> tuple[datetime.datetime, bo
     return when, has_time
 
 
+# "2024-03-15_123456_" in front of a name: written by this program's "rename for sorting" option
+RENAMED = re.compile(r"^(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})_(?P<H>\d{2})(?P<M>\d{2})(?P<S>\d{2})_")
+
+
+def strip_renamed(stem: str) -> str:
+    """The name without the prefix the rename option adds (the original name it was made from)."""
+    m = RENAMED.match(stem)
+    return stem[m.end():] if m and _to_date(m, (1, 9999)) else stem
+
+
 def from_name(stem: str, years: tuple[int, int], user_patterns: tuple[str, ...] = ()) -> NameDate | None:
-    """The date in a file name (without extension), or None."""
+    """The date in a file name (without extension), or None.
+
+    A name this program renamed ("2024-03-15_123456_KakaoTalk_...") gives the date it was renamed
+    to, and the where-it-came-from of the original name: otherwise a second run would read the
+    name differently (the specific patterns are anchored at the start) and move the file again."""
+    renamed = RENAMED.match(stem)
+    if renamed:
+        got = _to_date(renamed, years)
+        if got:
+            rest = from_name(stem[renamed.end():], (1, 9999), user_patterns)
+            return NameDate(got[0], got[1], rest.source if rest else "")
     c = compiled(user_patterns)
     general = [d for d in (_to_date(m, years) for m in c.general.finditer(stem)) if d]
     multiple = len({d[0].date() for d in general}) > 1
@@ -131,6 +151,7 @@ def from_name(stem: str, years: tuple[int, int], user_patterns: tuple[str, ...] 
 
 def source_of(stem: str) -> str:
     """Where a name says the file came from ("" when it does not say)."""
+    stem = strip_renamed(stem)
     for _name, source, rx in compiled().builtin:
         if rx.search(stem):
             return source

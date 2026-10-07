@@ -355,3 +355,126 @@ def test_worker_reads_no_tk_variable(app, sample_folder, monkeypatch):
     monkeypatch.setattr(tk.BooleanVar, "get", guarded)
     app.request_plan(now=True)
     assert pump(app.root, lambda: ready(app))
+
+
+class Drop:
+    def __init__(self, data):
+        self.data = data
+
+
+@pytest.mark.parametrize("spelling", ["{%s}", "%s"])
+def test_dropped_folder_with_spaces_and_unicode(app, root, tmp_path, spelling):
+    """tkdnd wraps a path with spaces in braces; a path without spaces comes as it is."""
+    folder = tmp_path / ("사진 폴더 2024" if "{" in spelling else "photos2024")
+    ms.photo(str(folder / "IMG_20240315_101010.jpg"), size=(24, 18))
+    app._on_drop(Drop(spelling % str(folder).replace("\\", "/")))
+    assert pump(root, lambda: ready(app))
+    assert app.source == str(folder) or os.path.normcase(app.source) == os.path.normcase(str(folder))
+    assert len(app.plan.items) == 1
+
+
+def test_dropping_a_file_opens_its_folder_and_two_folders_take_the_first(app, root, tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    ms.photo(str(a / "IMG_20240315_101010.jpg"), size=(24, 18))
+    ms.photo(str(b / "IMG_20230101_101010.jpg"), size=(24, 18))
+    app._on_drop(Drop("{%s} {%s}" % (str(a / "IMG_20240315_101010.jpg"), str(b))))
+    assert pump(root, lambda: ready(app))
+    assert os.path.normcase(app.source) == os.path.normcase(str(a))
+
+
+def test_dropping_while_busy_is_ignored(app, root, sample_folder, tmp_path):
+    load(app, sample_folder)
+    other = tmp_path / "other"
+    ms.photo(str(other / "IMG_20240315_101010.jpg"), size=(24, 18))
+    app.busy = "run"
+    try:
+        app._on_drop(Drop(str(other)))
+        app.open_folder(str(other))
+    finally:
+        app.busy = ""
+    assert os.path.normcase(app.source) == os.path.normcase(str(sample_folder))
+
+
+def test_changing_options_while_running_does_not_disturb_the_run(app, root, sample_folder):
+    before = snapshot(sample_folder)
+    load(app, sample_folder)
+    app.run_or_stop()
+    assert app.busy == "run"
+    for _ in range(3):  # a user clicking around while the files move
+        app.v_dedupe.set(not app.v_dedupe.get())
+        app._toggle("dedupe", app.v_dedupe)
+        app.pattern_box.set("{yyyy-mm}")
+        app._pattern_changed()
+        root.update()
+    assert pump(root, lambda: not app.busy and ready(app), 120)
+    assert app.band_kind == "done"
+    assert os.path.exists(sample_folder / "2024" / "2024-03-15") or os.path.exists(sample_folder / "2024-03")
+    assert not undo_failed(sample_folder, before)
+
+
+def undo_failed(folder, before):
+    import undo
+
+    u = undo.undo(undo.find_log(str(folder)))
+    return u.skipped or without_log(snapshot(folder)) != without_log(before)
+
+
+def test_cancelling_a_scan_keeps_the_window_usable(app, root, tmp_path):
+    folder = tmp_path / "big"
+    data = open(ms.photo(str(tmp_path / "t.jpg"), size=(16, 12)), "rb").read()
+    for n in range(3000):
+        d = folder / f"d{n // 500}"
+        os.makedirs(d, exist_ok=True)
+        (d / f"IMG_202401{1 + n % 28:02d}_101010_{n}.jpg").write_bytes(data + n.to_bytes(4, "big"))
+    app.open_folder(str(folder))
+    app.cancel.set()
+    assert pump(root, lambda: not app.busy, 60)
+    assert str(app.run_btn.cget("state")) == "disabled"  # no plan was made from half a scan
+    app.open_folder(str(folder))  # and the next try works
+    assert pump(root, lambda: ready(app), 120)
+    assert len(app.plan.items) == 3000
+
+
+def test_jpg_pair_as_duplicate_turns_the_convert_option_off(app, root, sample_folder):
+    load(app, sample_folder)
+    app.v_convert.set(True)
+    app._toggle("convert", app.v_convert)
+    assert pump(root, lambda: ready(app))
+    assert app.plan.summary()["convert"] == 1
+    app.prefs.jpg_pair_as_dupe = True
+    app.settings_changed("jpg_pair_as_dupe")
+    assert str(app.cb_convert.cget("state")) == "disabled"
+    assert pump(root, lambda: ready(app))
+    assert app.plan.summary()["convert"] == 0
+
+
+@pytest.mark.parametrize("lang", ["en", "ko", "zh-CN", "ja"])
+def test_settings_window_text_is_not_cut_off(app, root, lang):
+    i18n.set_lang(lang, persist=False)
+    app._build()
+    win = gui.SettingsWindow(app)
+    root.update()
+    width = win.win.winfo_width()
+    wide = [str(w) for w in _all_widgets(win.win) if w.winfo_ismapped() and w.winfo_class() in
+            ("TCheckbutton", "TRadiobutton", "TLabel") and
+            w.winfo_rootx() - win.win.winfo_rootx() + w.winfo_reqwidth() > width + 1]
+    win.win.destroy()
+    assert wide == [], (lang, width, wide)
+
+
+def _all_widgets(w):
+    for child in w.winfo_children():
+        yield child
+        yield from _all_widgets(child)
+
+
+def test_corrupt_settings_file_does_not_stop_the_program_starting(root, tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text('{"quality": "high", "theme": 5, "pattern": ["x"]', encoding="utf-8")  # cut off and wrong types
+    i18n._settings_path = str(path)
+    for child in root.winfo_children():
+        child.destroy()
+    a = gui.App(root)
+    root.update()
+    assert a.prefs.quality == 92 and a.pattern_box.get() == plan_mod.DEFAULT_PATTERN
+    a._poll = lambda: None

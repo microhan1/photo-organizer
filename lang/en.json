@@ -149,7 +149,7 @@
   "set_dupes_action": "Duplicates go to",
   "dupes_move": "_Duplicates folder",
   "dupes_trash": "Recycle Bin",
-  "set_jpg_pair_dupe": "Treat the JPG of a HEIC/RAW pair as a duplicate",
+  "set_jpg_pair_dupe": "Treat the JPG of a HEIC/RAW pair as a duplicate (turns HEIC → JPG off)",
   "set_year_range": "Accepted years",
   "set_year_max_hint": "(0 = this year)",
   "set_name_patterns": "Extra filename patterns",

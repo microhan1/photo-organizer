@@ -149,7 +149,7 @@
   "set_dupes_action": "重复文件",
   "dupes_move": "移到 _重复 文件夹",
   "dupes_trash": "移到回收站",
-  "set_jpg_pair_dupe": "把 HEIC/RAW 配对中的 JPG 视为重复",
+  "set_jpg_pair_dupe": "把 HEIC/RAW 配对中的 JPG 视为重复（HEIC → JPG 转换将关闭）",
   "set_year_range": "接受的年份",
   "set_year_max_hint": "（0 = 今年）",
   "set_name_patterns": "附加文件名规则",

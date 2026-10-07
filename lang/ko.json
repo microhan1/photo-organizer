@@ -149,7 +149,7 @@
   "set_dupes_action": "중복은",
   "dupes_move": "_중복 폴더로",
   "dupes_trash": "휴지통으로",
-  "set_jpg_pair_dupe": "HEIC·RAW 짝의 JPG를 중복으로 보기",
+  "set_jpg_pair_dupe": "HEIC·RAW 짝의 JPG를 중복으로 보기 (HEIC → JPG 변환은 꺼짐)",
   "set_year_range": "인정 연도 범위",
   "set_year_max_hint": "(0 = 올해)",
   "set_name_patterns": "파일명 패턴 추가",

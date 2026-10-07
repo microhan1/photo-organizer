@@ -93,6 +93,7 @@ class Item:
     similar: int = 0  # similar-photo group number (0: none)
     suggest_dup: bool = False
     keep: bool = False  # the user said "keep this one": never made a duplicate again
+    present: bool = False  # copy mode: an earlier run already copied this photo to its place
     truncated: bool = False
 
     @property
@@ -113,7 +114,7 @@ class Item:
 
     @property
     def acts(self) -> bool:
-        return self.checked and (self.moves or bool(self.convert_dst) or bool(self.heic_dst) or self.trashes)
+        return self.checked and not self.present and (self.moves or bool(self.convert_dst) or bool(self.heic_dst) or self.trashes)
 
     @property
     def trashes(self) -> bool:
@@ -198,9 +199,9 @@ def render_pattern(pattern: str, when: datetime.datetime, source: str, ext: str)
 
 
 def renamed_stem(when: datetime.datetime, stem: str) -> str:
-    """Sortable name: 2024-03-15_123456_IMG_0001 (left alone when it already starts that way)."""
-    prefix = when.strftime("%Y-%m-%d_%H%M%S_")
-    return stem if stem.startswith(prefix) else prefix + stem
+    """Sortable name: 2024-03-15_123456_IMG_0001. A prefix this option wrote earlier is replaced, never
+    stacked (a date changed by hand would otherwise give "2020-…_2019-…_name")."""
+    return when.strftime("%Y-%m-%d_%H%M%S_") + patterns.strip_renamed(stem)
 
 
 def fit_stem(folder: str, stem: str, exts: list[str]) -> tuple[str, bool]:
@@ -238,7 +239,12 @@ def _date_of_group(item: Item, opts: Options, manual: datetime.datetime | None) 
         item.when, item.basis = manual, dates.B_MANUAL
         item.source = dates.resolve(item.primary.meta, item.primary.stem, item.primary.mtime, opts.dates).source
         return
-    resolved = [dates.resolve(m.meta, m.stem, m.mtime, opts.dates) for m in item.members]
+    members = item.members
+    if opts.jpg_pair_as_dupe and item.primary.kind in ("heic", "avif", "raw"):
+        # the JPG of this pair is about to leave as a duplicate: its date must not decide where the photo
+        # goes, or the next run (JPG gone) would read another date and move the photo again (LESSONS A15)
+        members = [m for m in members if m.kind != "jpeg"]
+    resolved = [dates.resolve(m.meta, m.stem, m.mtime, opts.dates) for m in members]
     first = resolved[0]
     item.source = first.source
     if first.when is not None:
@@ -326,14 +332,67 @@ def _folders(pattern: str, day: datetime.date, source: str, ext: str, lang: str)
     return tuple(render_pattern(pattern, datetime.datetime(day.year, day.month, day.day), source, ext))
 
 
+@functools.lru_cache(maxsize=1)
+def _nodate_names() -> frozenset[str]:
+    """The "No Date" folder's name in every language (normalized for comparing)."""
+    return frozenset(unicodedata.normalize("NFC", n).casefold() for n in i18n.all_values("folder_nodate"))
+
+
+def _nodate_folder_in_place(item: Item, opts: Options) -> str:
+    """When the photo already sits in the destination's "No Date" folder, whatever language named it,
+    that folder is its place: switching the language must not move everything into a renamed folder."""
+    folder = item.primary.folder
+    if key_of(os.path.dirname(folder)) != key_of(opts.dest):
+        return ""
+    name = os.path.basename(folder)
+    return name if unicodedata.normalize("NFC", name).casefold() in _nodate_names() else ""
+
+
+def _copy_present(item: Item, folder: str, stem: str, ctx: "_Ctx") -> bool:
+    """Copy mode: every file of this photo is already at folder/stem with the very same bytes, and the
+    file is not part of this scan (an earlier run put it there). Then there is nothing to copy: running
+    the same copy again must not fill the duplicates folder with copies it already made."""
+    for m in item.members:
+        other = ctx.disk.existing(os.path.join(folder, stem + m.ext))
+        if not other or key_of(other) in ctx.scanned:
+            return False
+        try:
+            if os.path.getsize(fs(other)) != m.size or sha1_of(other) != media_sha1(m):
+                return False
+        except OSError:
+            return False
+    return not item.convert_dst or bool(ctx.disk.existing(os.path.join(folder, stem + ".jpg")))
+
+
+def _already_copied(item: Item, folder: str, stem: str, ctx: "_Ctx") -> bool:
+    """Walk the names this photo would get ("x", "x (2)", ...) while one exists on the disk; when one
+    of them is this photo's own earlier copy, the item is done: nothing to do, nothing numbered."""
+    candidate, n = stem, 1
+    while ctx.disk.existing(os.path.join(folder, candidate + item.primary.ext)):
+        if _copy_present(item, folder, candidate, ctx):
+            item.present = True
+            item.status = SAME
+            item.dsts = [m.path for m in item.members]
+            item.convert_dst = ""
+            return True
+        n += 1
+        candidate = f"{stem} ({n})"
+    return False
+
+
 def _target_folder(item: Item, opts: Options) -> list[str]:
     if opts.heic_only:
         return []
     if item.status == DUP:
         return [opts.dupes_name]
     if item.when is None:
-        return [opts.nodate_name] if opts.include_nodate else []
-    return list(_folders(opts.pattern, item.when.date(), item.source, item.primary.ext.lower(), i18n.current_lang()))
+        if not opts.include_nodate:
+            return []
+        return [_nodate_folder_in_place(item, opts) or opts.nodate_name]
+    ext = item.primary.ext.lower()
+    if item.convert_dst and opts.heic_original == "move":
+        ext = ".jpg"  # the HEIC leaves for the originals folder: the JPG stays as the photo, so {ext} is "jpg" every run
+    return list(_folders(opts.pattern, item.when.date(), item.source, ext, i18n.current_lang()))
 
 
 def _base_stem(item: Item, opts: Options) -> str:
@@ -420,6 +479,8 @@ def _place(item: Item, ctx: _Ctx) -> None:
     base = opts.dest
     folder = os.path.join(base, *_target_folder(item, opts))
     stem, item.truncated = fit_stem(folder, _base_stem(item, opts), _member_names(item, "") or [""])
+    if opts.mode == COPY and _already_copied(item, folder, stem, ctx):
+        return
     if item.status != DUP and not item.keep:
         twin = _same_content(item, folder, stem, ctx)
         if twin:

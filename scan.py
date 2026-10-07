@@ -259,7 +259,9 @@ def scan(root: str, exclude: list[str] | None = None, progress: ProgressFn | Non
             path = os.path.join(here, e.name)
             try:
                 if e.is_dir(follow_symlinks=False):
-                    if key_of(path) not in skip:
+                    # a symlink or NTFS junction can lead back up the tree: the same photos again and again,
+                    # until the path gets too long (LESSONS A11). Cloud-folder placeholders are neither.
+                    if key_of(path) not in skip and not e.is_symlink() and not e.is_junction():
                         subdirs.append(e.name)
                     continue
                 st = e.stat(follow_symlinks=False)  # from the listing on Windows: does not open the file

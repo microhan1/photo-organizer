@@ -102,9 +102,14 @@ def special_folders(root: str, dest: str) -> list[str]:
 
 def options(p: Prefs, root: str, dest: str | None = None, mode: str | None = None, heic_only: bool = False,
             convert_on: bool | None = None) -> plan_mod.Options:
+    wants_convert = p.convert if convert_on is None else convert_on
+    # "the JPG of a HEIC pair is a duplicate" and "convert HEIC to JPG" contradict each other: the
+    # converted JPG would be sent away as a duplicate and made again on the next run (LESSONS A10).
+    # "Convert only" mode has no duplicates, so it keeps working.
+    wants_convert = wants_convert and (heic_only or not p.jpg_pair_as_dupe)
     return plan_mod.Options(
         root=root, dest=dest or p.dest or root, mode=mode or p.mode, pattern=p.pattern, rename=p.rename,
-        include_nodate=p.include_nodate, convert=p.convert if convert_on is None else convert_on,
+        include_nodate=p.include_nodate, convert=wants_convert,
         convert_avif=p.convert_avif and convert_mod.avif_supported(), heic_only=heic_only,
         heic_original=p.heic_original, remove_empty=p.remove_empty, dupes_action=p.dupes_action,
         jpg_pair_as_dupe=p.jpg_pair_as_dupe, dates=p.date_options())

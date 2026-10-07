@@ -149,7 +149,7 @@
   "set_dupes_action": "重複は",
   "dupes_move": "_重複 フォルダーへ",
   "dupes_trash": "ごみ箱へ",
-  "set_jpg_pair_dupe": "HEIC・RAW ペアの JPG を重複とみなす",
+  "set_jpg_pair_dupe": "HEIC・RAW ペアの JPG を重複とみなす（HEIC → JPG 変換はオフ）",
   "set_year_range": "認める年の範囲",
   "set_year_max_hint": "（0 = 今年）",
   "set_name_patterns": "ファイル名パターンの追加",

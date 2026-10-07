@@ -845,8 +845,10 @@ class App:
     def _mode_widgets(self) -> None:
         """Convert only: HEIC -> JPG is on by definition, duplicates are not looked for."""
         state = "disabled" if self.heic_only.get() else "normal"
-        for w in (self.cb_dedupe, self.cb_similar, self.cb_convert):
+        for w in (self.cb_dedupe, self.cb_similar):
             w.configure(state=state)
+        # "the JPG of a HEIC pair is a duplicate" (Settings) excludes converting (LESSONS A14)
+        self.cb_convert.configure(state="disabled" if self.heic_only.get() or self.prefs.jpg_pair_as_dupe else "normal")
 
     def _similar_changed(self) -> None:
         on = bool(self.v_similar.get())
@@ -1266,6 +1268,8 @@ class App:
             self._update_dest_button()
         if name == "use_mtime":
             self.v_mtime.set(self.prefs.use_mtime)
+        if name == "jpg_pair_as_dupe":
+            self._mode_widgets()
         if name == "similar_threshold":
             self.similar_map = None
             self.v_similar.set(False)
