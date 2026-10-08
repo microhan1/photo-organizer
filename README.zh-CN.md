@@ -115,6 +115,11 @@ python main.py D:\照片 --undo
 - 不在界面上显示 GPS 坐标（转换时只原样复制）。
 - 不直接删除文件。重复文件移到 `_重复` 文件夹（可在设置中改为回收站）。
 
+## 系列
+
+- 书签工具：[音乐文件夹整理](https://github.com/microhan1/music-folder-organizer) · [音乐信息填充](https://github.com/microhan1/music-tag-filler)
+- [书签图书馆（Chaekgalpi Library）](https://chaekgalpi.co.kr/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — 记录读过的书和读书笔记的网页服务（仅韩语）
+
 ## 许可证
 
 MIT。使用的库：Pillow、pillow-heif（libheif）、piexif、sv-ttk、tkinterdnd2。

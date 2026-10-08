@@ -115,6 +115,11 @@ python main.py D:\사진 --undo
 - GPS 좌표를 화면에 보여 주지 않습니다(변환할 때 그대로 옮기기만).
 - 파일을 바로 삭제하지 않습니다. 중복은 `_중복` 폴더로(설정에서 휴지통 선택 가능).
 
+## 시리즈
+
+- 책갈피 툴: [음악 폴더 정리](https://github.com/microhan1/music-folder-organizer) · [음악 정보 채우기](https://github.com/microhan1/music-tag-filler)
+- [책갈피 라이브러리](https://chaekgalpi.co.kr/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — 읽은 책과 독서록을 기록하는 웹 서비스. 사진을 정리하다 그해 읽은 책이 떠오르면 한 줄 남겨 보세요.
+
 ## 라이선스
 
 MIT. 사용한 라이브러리: Pillow, pillow-heif(libheif), piexif, sv-ttk, tkinterdnd2.

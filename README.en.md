@@ -115,6 +115,11 @@ Options: `--pattern`, `--dest`, `--copy`, `--convert-heic`, `--heic-only`, `--de
 - It does not show GPS coordinates (it only copies them when converting).
 - It never deletes a file straight away. Duplicates go to `_Duplicates` (or the Recycle Bin, if you choose so in Settings).
 
+## Series
+
+- Chaekgalpi Tools: [Music Folder Organizer](https://github.com/microhan1/music-folder-organizer) · [Music Tag Filler](https://github.com/microhan1/music-tag-filler)
+- [Chaekgalpi Library](https://chaekgalpi.co.kr/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — a web service for logging the books you read and writing reviews (Korean only)
+
 ## License
 
 MIT. Libraries: Pillow, pillow-heif (libheif), piexif, sv-ttk, tkinterdnd2.
