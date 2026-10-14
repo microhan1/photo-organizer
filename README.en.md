@@ -129,7 +129,7 @@ When a newer version exists, a one-line notice appears at the bottom of the wind
 ## Series
 
 - Chaekgalpi Tools: [Music Folder Organizer](https://github.com/microhan1/music-folder-organizer) · [Music Tag Filler](https://github.com/microhan1/music-tag-filler)
-- [Chaekgalpi Library](https://chaekgalpi.co.kr/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — a web service for logging the books you read and writing reviews (Korean only)
+- [Chaekgalpi Library](https://chaekgalpi.co.kr/en/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — a web service for logging the books you read and writing reviews (tools page in English; the reading-log service itself is in Korean)
 
 ## License
 
