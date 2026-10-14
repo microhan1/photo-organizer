@@ -535,6 +535,26 @@ def test_update_opens_only_the_tools_site(app, root, sample_folder, monkeypatch)
     assert opened == [fake_info().url]
 
 
+EN_PAGE = "https://chaekgalpi.co.kr/en/tools/photoorganizer?utm_source=app"
+
+
+@pytest.mark.parametrize("lang, expected", [("ko", "url"), ("en", "en"), ("ja", "en"), ("zh-CN", "en")])
+def test_update_opens_the_english_page_for_non_korean_screens(app, root, sample_folder, monkeypatch, lang, expected):
+    opened = []
+    monkeypatch.setattr(gui.webbrowser, "open", lambda url: opened.append(url))
+    i18n.set_lang(lang, persist=False)
+    app._build()
+    load(app, sample_folder)
+    info = uc_mod.UpdateInfo("0.2.0", "0.1.3", fake_info().url, EN_PAGE)
+    app._on_update_result(info, True)
+    app._update_open()
+    assert opened == [EN_PAGE if expected == "en" else fake_info().url]
+    opened.clear()
+    app._on_update_result(fake_info(), True)  # no English page from the server: the Korean page
+    app._update_open()
+    assert opened == [fake_info().url]
+
+
 def test_switching_the_check_off_hides_the_notice_and_offline_keeps_the_day_free(app, root, sample_folder):
     load(app, sample_folder)
     app._on_update_result(None, False)  # offline: nothing shown, day not recorded

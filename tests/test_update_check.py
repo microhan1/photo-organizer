@@ -220,6 +220,28 @@ def test_only_pages_of_the_tools_site_are_opened(url):
     assert uc.interpret(dict(OK, url=url), APP_VERSION) is None
 
 
+EN_PAGE = "https://chaekgalpi.co.kr/en/tools/photoorganizer?utm_source=app&utm_medium=update"
+
+
+def test_english_page_for_non_korean_screens_when_the_server_gives_one():
+    info = uc.interpret(dict(OK, urlEn=EN_PAGE), APP_VERSION)
+    assert info.url == OK["url"] and info.url_en == EN_PAGE
+    assert uc.page_url(info, "ko") == OK["url"]
+    for lang in ("en", "ja", "zh-CN"):
+        assert uc.page_url(info, lang) == EN_PAGE
+    # the request itself is unchanged: still only slug, version and os (test_request_carries_only...)
+
+
+@pytest.mark.parametrize("url_en", [None, "", "https://example.com/en/tools/x", "http://chaekgalpi.co.kr/en/tools/x",
+                                    "https://chaekgalpi.co.kr.evil.example/en", 7, "missing"])
+def test_english_page_falls_back_to_the_korean_page(url_en):
+    data = dict(OK) if url_en == "missing" else dict(OK, urlEn=url_en)
+    info = uc.interpret(data, APP_VERSION)
+    assert info is not None and info.url_en == ""
+    for lang in ("ko", "en", "ja", "zh-CN"):
+        assert uc.page_url(info, lang) == OK["url"]
+
+
 @pytest.mark.parametrize("latest", ["", "   ", None, 3, "x" * 40])
 def test_odd_versions_show_nothing(latest):
     assert uc.interpret(dict(OK, latest=latest), APP_VERSION) is None

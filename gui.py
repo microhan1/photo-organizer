@@ -1305,7 +1305,7 @@ class App:
         info = self._update_info
         if info is not None and info.url.startswith(update_check.SITE):
             try:
-                webbrowser.open(info.url)
+                webbrowser.open(update_check.page_url(info, i18n.current_lang()))
             except Exception:
                 pass
         self._hide_update_notice()
