@@ -478,3 +478,131 @@ def test_corrupt_settings_file_does_not_stop_the_program_starting(root, tmp_path
     root.update()
     assert a.prefs.quality == 92 and a.pattern_box.get() == plan_mod.DEFAULT_PATTERN
     a._poll = lambda: None
+
+
+# ------------------------------------------------------------------ new version notice (v0.1.3)
+import prefs as prefs_mod
+import update_check as uc_mod
+
+
+def fake_info(latest="0.2.0"):
+    from version import APP_VERSION
+
+    return uc_mod.UpdateInfo(latest, APP_VERSION, "https://chaekgalpi.co.kr/tools/photoorganizer?utm_source=app")
+
+
+def geometry(app, root):
+    root.update()
+    widgets = [app.run_btn, app.undo_btn, app.options_row, app.table.tree]
+    return [(w.winfo_rootx() - root.winfo_rootx(), w.winfo_rooty() - root.winfo_rooty(), w.winfo_width()) for w in widgets]
+
+
+def test_update_notice_is_one_line_and_moves_nothing_else(app, root, sample_folder):
+    load(app, sample_folder)
+    before = geometry(app, root)
+    assert app.update_area.winfo_children() == []
+    app._on_update_result(fake_info(), True)
+    root.update()
+    band = app.update_area.winfo_children()
+    assert len(band) == 1 and all(fully_visible(w, root) for w in _all_widgets(app.update_area))
+    after = geometry(app, root)
+    assert [g[:1] + g[2:] for g in before] == [g[:1] + g[2:] for g in after]  # same x and width: only the table got shorter
+    assert after[0][1] == before[0][1] and after[1][1] == before[1][1]  # Run / Undo did not move
+    assert app.table.winfo_height() > 3 * theme.ROW_HEIGHT
+    assert app.prefs.update_check_last == uc_mod.today()
+    texts = [w.cget("text") for w in _all_widgets(app.update_area) if w.winfo_class() in ("Label", "TButton")]
+    assert i18n.t("update_available", latest="0.2.0", current=fake_info().current) in texts
+    assert i18n.t("btn_update") in texts and i18n.t("btn_later") in texts
+
+
+def test_later_hides_the_notice_and_remembers_the_version(app, root, sample_folder):
+    load(app, sample_folder)
+    app._on_update_result(fake_info(), True)
+    app._update_later()
+    root.update()
+    assert app.update_area.winfo_children() == [] and app.prefs.update_check_skipped == "0.2.0"
+
+
+def test_update_opens_only_the_tools_site(app, root, sample_folder, monkeypatch):
+    opened = []
+    monkeypatch.setattr(gui.webbrowser, "open", lambda url: opened.append(url))
+    load(app, sample_folder)
+    app._on_update_result(fake_info(), True)
+    app._update_open()
+    assert opened == [fake_info().url] and app.update_area.winfo_children() == []
+    app._update_info = uc_mod.UpdateInfo("0.2.0", "0.1.3", "https://example.com/x")  # never produced by interpret(); belt and braces
+    app._update_open()
+    assert opened == [fake_info().url]
+
+
+def test_switching_the_check_off_hides_the_notice_and_offline_keeps_the_day_free(app, root, sample_folder):
+    load(app, sample_folder)
+    app._on_update_result(None, False)  # offline: nothing shown, day not recorded
+    assert app.prefs.update_check_last == "" and app.update_area.winfo_children() == []
+    app._on_update_result(fake_info(), True)
+    root.update()
+    assert app.update_area.winfo_children()
+    app.prefs.update_check = False
+    app.settings_changed("update_check")
+    root.update()
+    assert app.update_area.winfo_children() == []
+    app._on_update_result(fake_info(), True)  # arrives after the switch: not shown
+    assert app.update_area.winfo_children() == []
+
+
+@pytest.mark.parametrize("lang", ["en", "ko", "zh-CN", "ja"])
+def test_update_notice_fits_at_the_minimum_size_in_every_language(app, root, sample_folder, lang):
+    root.geometry(f"{theme.WINDOW_MIN[0]}x{theme.WINDOW_MIN[1]}")
+    i18n.set_lang(lang, persist=False)
+    app._build()
+    load(app, sample_folder)
+    app._on_update_result(fake_info(), True)
+    root.update()
+    bad = [str(w) for w in _all_widgets(app.update_area) if not fully_visible(w, root)]
+    assert bad == [], (lang, bad)
+    assert fully_visible(app.run_btn, root) and app.table.winfo_height() > 3 * theme.ROW_HEIGHT
+    i18n.set_lang("ja" if lang != "ja" else "en", persist=False)
+    app._build()  # a language switch keeps the notice, in the new language
+    root.update()
+    texts = [w.cget("text") for w in _all_widgets(app.update_area) if w.winfo_class() == "TButton"]
+    assert i18n.t("btn_update") in texts
+
+
+def test_closing_the_window_while_the_request_is_out_survives(root, monkeypatch):
+    """Three times: a window with Tk variables starts a check, is closed while the request
+    is still out, then the answer arrives. Nothing may run on the closed window and the
+    process must not abort (Tcl_AsyncDelete)."""
+    import threading
+
+    monkeypatch.setattr(uc_mod, "DELAY_MS", 10)
+    for _ in range(3):
+        win = tk.Toplevel(root)
+        holder = {"var": tk.StringVar(win, "x"), "win": win}
+        gate, started, ran = threading.Event(), threading.Event(), []
+
+        def fetcher(slug, version, gate=gate, started=started):
+            started.set()
+            gate.wait(10)
+            return {"updateAvailable": True, "latest": "0.2.0", "url": uc_mod.SITE + "tools/photoorganizer"}
+
+        def on_result(info, answered, holder=holder, ran=ran):
+            holder["var"].set("touched")  # would be a TclError on a closed window
+            ran.append(info)
+
+        assert uc_mod.check_async(win, "photoorganizer", "0.1.3", prefs_mod.Prefs(), on_result, fetcher=fetcher)
+        assert pump(root, started.is_set, 10)
+        win.destroy()
+        holder.clear()  # the test holds nothing either: the thread must be the only thing left
+        gate.set()
+        assert pump(root, lambda: not any(t.name == "update-check" for t in threading.enumerate()), 10)
+        for _ in range(5):  # let the poll fire a few more times after the answer arrived
+            time.sleep(uc_mod.POLL_MS / 1000)
+            root.update()
+        assert ran == []
+
+
+def test_settings_tab_has_the_check_box_on_by_default(app, root, sample_folder):
+    load(app, sample_folder)
+    win = gui.SettingsWindow(app)
+    assert win.vars["update_check"].get() is True
+    win.win.destroy()

@@ -25,6 +25,7 @@ PRD와 결정 사항: [docs/PRD.md](docs/PRD.md). 실제로 있었던 문제와 
 - 한 줄에 늘어나는 것과 고정 크기 것이 같이 있으면 고정 크기를 먼저 pack. 나중에 보였다 숨겼다 하는 위젯은 `pack(before=...)`. 줄에 위젯을 더하면 그 줄의 pack 순서를 다시 읽는다.
 - 화면 문자열은 전부 `lang/*.json`(4개 언어, 같은 키·같은 치환자). 폴더 이름의 날짜는 언어와 무관하게 ISO.
 - 필드·변수 이름과 같은 이름의 모듈은 별칭으로 가져온다(LESSONS A1).
+- 새 버전 확인(`update_check.py`)은 도구 이름·버전·`win` 외에 아무것도 보내지 않고, `updateAvailable`이 불리언 true일 때만 창 아래 한 줄(모달 금지), url은 `https://chaekgalpi.co.kr/`로 시작할 때만 연다. 릴리스마다 `version.py`의 `APP_VERSION`을 올린다. 시험·캡처에서는 `fetcher=`를 명시해 가짜 응답을 쓴다(기본 인자는 모듈 패치로 안 바뀜, LESSONS D14). 작업 스레드는 Tk 객체를 쥐지 않는다: 결과는 dict에, Tk 쪽이 `after(POLL_MS, poll)`로 가져간다(D17).
 
 ## 검증 순서
 

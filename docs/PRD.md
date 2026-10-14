@@ -432,6 +432,7 @@ PRD가 정하지 않았거나, 구현하며 바꾼 것. 나중에 바꾸면 이 
 - **정렬용 이름 바꾸기**: 접두어 `2024-03-15_123456_`는 다음 실행에서 원래 이름으로 읽음(출처 판정), 날짜를 고치면 접두어를 바꿈(쌓지 않음) (A10)
 - **옵션 충돌**: "HEIC·RAW 짝의 JPG를 중복으로"가 켜져 있으면 "HEIC → JPG" 변환은 쓰지 않음(변환 체크박스가 꺼지고 설정 문구에 표시). 그 JPG는 날짜 근거에서도 뺌. 변환하고 원본을 옮기면 `{ext}`는 `jpg` (A14·A15·A16)
 - **제자리 판정은 번호 카운터보다 먼저**: 파일이 대상 폴더에 "경로 한계에 맞춘 줄기" 또는 "줄기 (n)" 이름으로 이미 있으면 그 자리가 제자리(`plan._in_place_already`). 긴 이름이 잘려 한 줄기를 공유할 때 카운터가 자기 이름 자리를 건너뛰던 것을 막음 (LESSONS A17)
+- **새 버전 확인 (v0.1.3, 메인 프로젝트 지시서 2026-10-13)**: `update_check.py`(music-tag-filler와 같은 구조, 표준 라이브러리만)가 창이 뜬 뒤 1.5초에 백그라운드 스레드로 한 번 `GET chaekgalpi.co.kr/api/tools/photoorganizer/latest?v=버전&os=win`(User-Agent `chaekgalpi-tool/photoorganizer/버전`, 타임아웃 4초). 보내는 것은 도구 이름·버전·`win`뿐. 하루 한 번(`update_check_last`는 서버가 답했을 때만 기록), `update_check=false`면 안 물음. `updateAvailable`이 불리언 true일 때만 창 아래 한 줄(결과 띠 위, 모달 아님): 「새 버전이 나왔습니다: {latest} (현재 {current})」 [업데이트](url이 `https://chaekgalpi.co.kr/`로 시작할 때만 브라우저) [다음에](`update_check_skipped={latest}`). 체크박스 「새 버전 확인」은 옵션 줄이 꽉 차 있어(LESSONS A6) **설정 ⚙ → 일반 탭**에 둠(기본 켬). 버전은 `version.py`의 `APP_VERSION`. README의 "인터넷 없이 동작" 약속에 이 예외를 적음. 자동 다운로드·교체 없음. 스레드는 결과를 dict에만 담고 Tk 쪽이 `after(100, poll)`로 가져감(창을 닫아도 스레드가 Tk 객체를 쥐지 않도록, LESSONS D17)
 - **음악 툴과 공유하는 코드**: `mover.py`의 기록(RunLog·journal·LogWriteError)과 파일 함수, `undo.py`는 music-folder-organizer와 같음. 이 저장소에서 더한 것: 긴 경로(`fs()`), `._*` 정크 파일, 짝 파일 묶음 이동과 실패 시 되돌림, 변환 단계와 그 되돌리기(`convert` 단계)
 
 ## 완료 기준 확인 (2026-10-06)

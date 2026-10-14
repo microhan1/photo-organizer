@@ -43,6 +43,9 @@ class Prefs:
     remove_empty: bool = True
     thumbnails: bool = False
     last_log: str = ""
+    update_check: bool = True  # once a day, ask the tools site whether a newer version exists
+    update_check_last: str = ""  # YYYY-MM-DD of the last check the server answered
+    update_check_skipped: str = ""  # "Later" was pressed for this version: do not show it again
 
     def date_options(self) -> dates.DateOptions:
         return dates.DateOptions(self.use_mtime, self.year_min, self.year_max, tuple(self.name_patterns))
@@ -71,6 +74,8 @@ def load() -> Prefs:
         if not lo <= getattr(p, name) <= hi:
             setattr(p, name, getattr(default, name))
     p.name_patterns = [s for s in p.name_patterns if isinstance(s, str) and s.strip()]
+    p.update_check_last = p.update_check_last.strip()[:10]
+    p.update_check_skipped = p.update_check_skipped.strip()[:32]
     if not p.pattern.strip() or plan_mod.validate_pattern(p.pattern):
         p.pattern = default.pattern
     return p

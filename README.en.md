@@ -4,7 +4,7 @@
 
 [한국어](README.md) · [中文](README.zh-CN.md) · [日本語](README.ja.md)
 
-> **Works without an internet connection.**
+> **Works without an internet connection.** The only exception is the update check — tool name and version only, once a day, can be turned off.
 > **Your photos are never uploaded anywhere.**
 > **Every run can be undone.**
 
@@ -106,6 +106,16 @@ python main.py D:\Photos --undo
 
 Options: `--pattern`, `--dest`, `--copy`, `--convert-heic`, `--heic-only`, `--dedupe`, `--similar`, `--use-mtime`, `--include-nodate`, `--dry-run`, `--undo`, `--lang ko|en|zh-CN|ja`
 
+## Update check
+
+To see whether a newer version exists, the app sends only the tool name (`photoorganizer`) and its version to the 책갈피 (Chaekgalpi) server, chaekgalpi.co.kr, when it starts. No file or photo is sent, it checks at most once a day, and it can be turned off (Settings ⚙ → General → **Check for updates**). The check runs in the background after the window opens; without a connection nothing is shown.
+
+When a newer version exists, a one-line notice appears at the bottom of the window. **Update** opens the tool's page on the Chaekgalpi site; **Later** hides it and that version is not mentioned again (a newer one is). Nothing is downloaded or replaced automatically.
+
+![Update notice](docs/update_notice.png)
+
+*The notice line, shown with a fake server answer (version 0.2.0) for this picture.*
+
 ## What it does not do
 
 - It does not edit photos (no cropping, no colour fixes). Conversion only turns them upright.
@@ -114,6 +124,7 @@ Options: `--pattern`, `--dest`, `--copy`, `--convert-heic`, `--heic-only`, `--de
 - It does not change EXIF. A date corrected in the table only changes the folder.
 - It does not show GPS coordinates (it only copies them when converting).
 - It never deletes a file straight away. Duplicates go to `_Duplicates` (or the Recycle Bin, if you choose so in Settings).
+- It does not download or replace a new version by itself. The update check sends only the tool's name and version and can be turned off.
 
 ## Series
 

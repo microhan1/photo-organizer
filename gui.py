@@ -31,8 +31,13 @@ import prefs as prefs_mod
 import scan as scan_mod
 import theme
 import undo as undo_mod
+import update_check
+import webbrowser
 from longpath import fs
 from i18n import t
+from version import APP_VERSION
+
+UPDATE_SLUG = "photoorganizer"  # the tool's name on the 책갈피 tools site
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -350,8 +355,12 @@ class App:
         self.heic_only = tk.BooleanVar(value=False)
         self._apply_theme()
         self.content: ttk.Frame | None = None
+        self._update_info: update_check.UpdateInfo | None = None
         self._build()
         root.after(POLL_MS, self._poll)
+        # once a day, 1.5 s after the window is up, on a background thread; silent on any failure.
+        # Sends the tool's name, version and "win" only (README "새 버전 확인").
+        update_check.check_async(root, UPDATE_SLUG, APP_VERSION, self.prefs, self._on_update_result)
         if _HAS_DND:
             try:
                 root.drop_target_register(DND_FILES)
@@ -415,6 +424,8 @@ class App:
         self.footer.pack(side="bottom", fill="x", pady=(P, 0))
         self.band_area = ttk.Frame(c)
         self.band_area.pack(side="bottom", fill="x")
+        self.update_area = ttk.Frame(c)  # the one-line "new version" notice, above the result band
+        self.update_area.pack(side="bottom", fill="x")
         self._build_header(c)
         self.top_area = ttk.Frame(c)
         self.top_area.pack(side="top", fill="x", pady=(P, 0))
@@ -439,6 +450,8 @@ class App:
         self._update_buttons()
         if self.band_kind:
             self._show_band(self.band_kind)
+        if self._update_info is not None:
+            self._show_update_notice()  # again in the new language
 
     def _build_header(self, c) -> None:
         P = px(theme.PAD)
@@ -1253,6 +1266,56 @@ class App:
     def open_dest(self) -> None:
         open_path(self.dest or self.source)
 
+    # -------------------------------------------------------------- new version notice
+    def _on_update_result(self, info: update_check.UpdateInfo | None, answered: bool) -> None:
+        """Tk thread. The day is recorded only when the server answered, so an offline
+        start asks again next time."""
+        if answered:
+            self.prefs.update_check_last = update_check.today()
+            prefs_mod.save(self.prefs)
+        if info is not None and self.prefs.update_check:
+            self._update_info = info
+            self._show_update_notice()
+
+    def _show_update_notice(self) -> None:
+        """One line above the result band, never a dialog: text, [Update], [Later]."""
+        for w in self.update_area.winfo_children():
+            w.destroy()
+        info = self._update_info
+        if info is None:
+            return
+        P = px(theme.PAD)
+        bg = self.colors["drop_bg"]
+        band = tk.Frame(self.update_area, bg=bg, padx=P * 2, pady=P)
+        band.pack(fill="x", pady=(P, 0))
+        # fixed-size buttons first, the stretching text last (LESSONS A15/A18)
+        ttk.Button(band, text=t("btn_later"), command=self._update_later).pack(side="right")
+        ttk.Button(band, text=t("btn_update"), style="Accent.TButton", command=self._update_open).pack(
+            side="right", padx=(0, P))
+        tk.Label(band, text=t("update_available", latest=info.latest, current=info.current), bg=bg,
+                 fg=self.colors["text"], font=self.f_body, anchor="w").pack(side="left", fill="x", expand=True)
+
+    def _hide_update_notice(self) -> None:
+        self._update_info = None
+        for w in self.update_area.winfo_children():
+            w.destroy()
+
+    def _update_open(self) -> None:
+        """The tools page, never a download: the site counts and serves the download."""
+        info = self._update_info
+        if info is not None and info.url.startswith(update_check.SITE):
+            try:
+                webbrowser.open(info.url)
+            except Exception:
+                pass
+        self._hide_update_notice()
+
+    def _update_later(self) -> None:
+        if self._update_info is not None:
+            self.prefs.update_check_skipped = self._update_info.latest  # a newer one is shown again
+            prefs_mod.save(self.prefs)
+        self._hide_update_notice()
+
     # -------------------------------------------------------------- settings
     def open_settings(self) -> None:
         SettingsWindow(self)
@@ -1270,6 +1333,9 @@ class App:
             self.v_mtime.set(self.prefs.use_mtime)
         if name == "jpg_pair_as_dupe":
             self._mode_widgets()
+        if name == "update_check" and not self.prefs.update_check:
+            self._hide_update_notice()
+            return  # no plan depends on it
         if name == "similar_threshold":
             self.similar_map = None
             self.v_similar.set(False)
@@ -1339,6 +1405,7 @@ class SettingsWindow:
         for value in ("move", "trash"):
             self._radio(row, "dupes_action", value, t(f"dupes_{value}"))
         self._check(general, "jpg_pair_as_dupe", t("set_jpg_pair_dupe"))
+        self._check(general, "update_check", t("opt_update_check"))
 
         self._check(dates_tab, "use_mtime", t("opt_use_mtime"))
         row = self._row(dates_tab, t("set_year_range"))
