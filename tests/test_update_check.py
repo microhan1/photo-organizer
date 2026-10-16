@@ -76,6 +76,20 @@ def counting(answer):
     return fetcher, calls
 
 
+def test_tests_never_reach_the_real_server():
+    """conftest replaces the defaults the program uses (fetcher, opener) for every test:
+    a bare fetch() must be refused and recorded, never sent (LESSONS D18)."""
+    import conftest
+    import urllib.request
+
+    assert uc.check_async.__kwdefaults__["fetcher"] is conftest._no_fetch
+    assert uc.fetch.__kwdefaults__["opener"] is conftest._no_network
+    assert urllib.request.urlopen is conftest._no_network
+    assert uc.fetch(SLUG, APP_VERSION) is None
+    assert len(conftest._blocked) == 1 and "chaekgalpi.co.kr" in conftest._blocked[0]
+    conftest._blocked.clear()  # the guard did its job; this test must not fail its own teardown
+
+
 def test_version_is_a_release_number():
     assert APP_VERSION.count(".") == 2 and all(p.isdigit() for p in APP_VERSION.split("."))
 

@@ -13,6 +13,40 @@ sys.path.insert(0, os.path.join(ROOT, "samples"))
 
 import i18n  # noqa: E402
 import make_samples as ms  # noqa: E402
+import update_check as _uc  # noqa: E402
+
+# ---- No test ever asks the real tools server (LESSONS D18: one full pytest run sent 51
+# requests to chaekgalpi.co.kr through the GUI tests' App fixture; 511 hits in two days).
+# fetch() binds opener=urlopen and check_async() binds fetcher=fetch at definition time
+# (LESSONS D14), so the defaults themselves are replaced, not the module attributes.
+_blocked: list[str] = []  # requests the program tried to send during the current test
+
+
+def _no_fetch(slug, version):
+    """What every App gets instead of fetch(): the server did not answer."""
+    return None
+
+
+def _no_network(req, timeout=None):
+    """Second line of defence: any opener call for the tools site fails the test."""
+    import urllib.error
+
+    url = req.full_url if hasattr(req, "full_url") else str(req)
+    if "chaekgalpi.co.kr" in url:
+        _blocked.append(url)
+    raise urllib.error.URLError("blocked by tests/conftest.py: tests never reach the real server")
+
+
+@pytest.fixture(autouse=True)
+def no_real_update_check(monkeypatch):
+    import urllib.request
+
+    monkeypatch.setitem(_uc.check_async.__kwdefaults__, "fetcher", _no_fetch)
+    monkeypatch.setitem(_uc.fetch.__kwdefaults__, "opener", _no_network)
+    monkeypatch.setattr(urllib.request, "urlopen", _no_network)
+    _blocked.clear()
+    yield
+    assert not _blocked, f"a test tried to reach the real tools server: {_blocked}"
 
 
 @pytest.fixture(autouse=True)

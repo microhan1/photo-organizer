@@ -42,8 +42,12 @@ def main() -> int:
         i18n.update_settings(theme="dark")
     import gui
     import theme
+    import update_check
     from PIL import ImageGrab
 
+    # Never ask the real server from a capture: check_async binds fetcher=fetch at definition
+    # time (LESSONS D14), so the default itself is replaced, not the module attribute.
+    update_check.check_async.__kwdefaults__["fetcher"] = lambda slug, version: None
     gui._enable_dpi_awareness()
     i18n.init(langs[0])
     root = gui.TkinterDnD.Tk() if gui._HAS_DND else gui.tk.Tk()
