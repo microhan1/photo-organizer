@@ -356,6 +356,7 @@ class App:
         self._apply_theme()
         self.content: ttk.Frame | None = None
         self._update_info: update_check.UpdateInfo | None = None
+        self.feedback_win: tk.Toplevel | None = None  # the address window when no browser opened
         self._build()
         root.after(POLL_MS, self._poll)
         # once a day, 1.5 s after the window is up, on a background thread; silent on any failure.
@@ -399,7 +400,8 @@ class App:
         style.configure("Treeview", font=self.f_table, rowheight=px(theme.ROW_HEIGHT))
         style.configure("Treeview.Heading", font=self.f_body)
         style.map("Treeview", background=[("selected", self.colors["accent"])], foreground=[("selected", "#FFFFFF")])
-        for w in ("TLabel", "TButton", "TCheckbutton", "TRadiobutton", "TCombobox", "TEntry", "TNotebook.Tab"):
+        for w in ("TLabel", "TButton", "Toolbutton", "TCheckbutton", "TRadiobutton", "TCombobox", "TEntry",
+                  "TNotebook.Tab"):
             style.configure(w, font=self.f_body)
         style.configure("Muted.TLabel", foreground=self.colors["muted"])
         style.configure("Warn.TLabel", foreground=self.colors["warn"])
@@ -464,6 +466,8 @@ class App:
         self.lang_box.set(i18n.LANG_NAMES[i18n.current_lang()])
         self.lang_box.bind("<<ComboboxSelected>>", self._on_lang)
         self.lang_box.pack(side="right", padx=(0, P))
+        self.feedback_btn = ttk.Button(bar, text=t("btn_feedback"), style="Toolbutton", command=self.send_feedback)
+        self.feedback_btn.pack(side="right", padx=(0, P))
         ttk.Label(bar, text=t("app_title"), style="Name.TLabel").pack(side="left")
         self.path_label = ttk.Label(bar, text=short(self.source, 80), style="Muted.TLabel")
         self.path_label.pack(side="left", fill="x", expand=True, padx=(P * 2, P))
@@ -1315,6 +1319,52 @@ class App:
             self.prefs.update_check_skipped = self._update_info.latest  # a newer one is shown again
             prefs_mod.save(self.prefs)
         self._hide_update_notice()
+
+    # -------------------------------------------------------------- feedback
+    def send_feedback(self) -> None:
+        """Open the feedback box on the tools page in the browser; the program itself sends
+        nothing. When no browser opens, show the address so it can be copied."""
+        url = update_check.feedback_url(UPDATE_SLUG, APP_VERSION, i18n.current_lang())
+        try:
+            opened = webbrowser.open(url)
+        except Exception:  # webbrowser.Error, OSError: the window stays as it is
+            opened = False
+        if not opened:
+            self._show_feedback_address(url)
+
+    def _show_feedback_address(self, url: str) -> None:
+        """A small window, not modal: the message, the address (selected) and [Copy]."""
+        if self.feedback_win is not None and self.feedback_win.winfo_exists():
+            self.feedback_win.destroy()
+        P = px(theme.PAD)
+        win = tk.Toplevel(self.root)
+        win.title(t("btn_feedback"))
+        win.transient(self.root)
+        win.resizable(False, False)
+        win.configure(bg=self.colors["bg"])
+        box = ttk.Frame(win, padding=px(theme.PAD_OUT))
+        box.pack(fill="both", expand=True)
+        ttk.Label(box, text=t("feedback_failed"), wraplength=px(460), justify="left").pack(anchor="w")
+        entry = ttk.Entry(box, width=60, font=self.f_body)
+        entry.insert(0, url)
+        entry.configure(state="readonly")
+        entry.pack(fill="x", pady=(P, 0))
+        buttons = ttk.Frame(box)
+        buttons.pack(fill="x", pady=(P, 0))
+        ttk.Button(buttons, text=t("btn_close"), command=win.destroy).pack(side="right")
+        copy_btn = ttk.Button(buttons, text=t("btn_copy"), style="Accent.TButton")
+        copy_btn.pack(side="right", padx=(0, P))
+
+        def copy() -> None:
+            win.clipboard_clear()
+            win.clipboard_append(url)
+            copy_btn.configure(text=t("btn_copied"))
+
+        copy_btn.configure(command=copy)
+        entry.select_range(0, "end")
+        entry.focus_set()
+        self.feedback_win = win
+        self.feedback_entry = entry
 
     # -------------------------------------------------------------- settings
     def open_settings(self) -> None:

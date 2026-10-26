@@ -126,6 +126,14 @@ python main.py D:\사진 --undo
 - 파일을 바로 삭제하지 않습니다. 중복은 `_중복` 폴더로(설정에서 휴지통 선택 가능).
 - 새 버전을 자동으로 내려받거나 바꾸지 않습니다. 새 버전 확인은 도구 이름·버전만 보내며 설정에서 끌 수 있습니다.
 
+## 의견 보내기
+
+안 되는 것·불편한 것·바라는 기능은 프로그램 위쪽의 **의견 보내기**를 누르거나 [책갈피 툴 페이지의 의견 칸](https://chaekgalpi.co.kr/tools/photoorganizer#feedback)에서 로그인 없이 보낼 수 있습니다. **의견 보내기**는 브라우저로 그 페이지를 열기만 하고, 프로그램이 직접 보내는 것은 없습니다. [GitHub Issues](https://github.com/microhan1/photo-organizer/issues)도 그대로 받습니다.
+
+![의견 보내기 버튼](docs/feedback_button.png)
+
+*그림: 창 오른쪽 위의 **의견 보내기** · 언어 선택 · 설정 ⚙.*
+
 ## 시리즈
 
 - 책갈피 툴: [음악 폴더 정리](https://github.com/microhan1/music-folder-organizer) · [음악 정보 채우기](https://github.com/microhan1/music-tag-filler)

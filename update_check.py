@@ -7,6 +7,7 @@ silent. The server decides whether the version is older (`updateAvailable`); nul
 "cannot compare" and shows nothing. Standard library only.
 
 Same structure as music-tag-filler's update_check.py (the first tool with the check).
+feedback_url() is the address "Send feedback" opens in the browser; nothing is sent for it.
 """
 from __future__ import annotations
 
@@ -40,6 +41,24 @@ def page_url(info: UpdateInfo, lang: str) -> str:
     if lang != "ko" and info.url_en:
         return info.url_en
     return info.url
+
+
+FEEDBACK = "https://chaekgalpi.co.kr/tools/{slug}"
+FEEDBACK_EN = "https://chaekgalpi.co.kr/en/tools/{slug}"  # the site has no Japanese or Chinese page
+FEEDBACK_EN_LANGS = ("en", "ja", "zh-cn")
+
+
+def feedback_url(slug: str, version: str | None, lang: str | None) -> str:
+    """The tools page's feedback box, opened in the browser by "Send feedback". Built from
+    constants only; the program sends nothing itself. Korean for ko and any unknown
+    language; the English page for en, ja and zh-CN. `v` is left out when there is no
+    version. #feedback scrolls the page down to the box."""
+    code = (lang or "").strip().lower().replace("_", "-")
+    base = (FEEDBACK_EN if code in FEEDBACK_EN_LANGS else FEEDBACK).format(slug=slug)
+    query = "utm_source=app&utm_medium=feedback"
+    if version and version.strip():
+        query += "&v=" + urllib.parse.quote(version, safe="")
+    return f"{base}?{query}#feedback"
 
 
 def today() -> str:

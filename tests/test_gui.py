@@ -82,7 +82,7 @@ def test_every_control_fits_in_every_language(app, root, sample_folder, lang, si
     load(app, sample_folder)
     root.update()
     controls = [app.run_btn, app.undo_btn, app.dest_btn, app.pattern_box, app.cb_convert, app.cb_dedupe,
-                app.cb_similar, app.lang_box]
+                app.cb_similar, app.lang_box, app.feedback_btn]
     controls += list(app.options_row.winfo_children())
     controls += [w for f in (app.sum_line, app.sum_line2) for w in f.pack_slaves()]  # what the bar shows now
     assert app.mtime_cb is not None and app.mtime_cb.winfo_manager()  # the samples have files without a date
@@ -626,3 +626,164 @@ def test_settings_tab_has_the_check_box_on_by_default(app, root, sample_folder):
     win = gui.SettingsWindow(app)
     assert win.vars["update_check"].get() is True
     win.win.destroy()
+
+
+# ------------------------------------------------------------------ send feedback (v0.1.5)
+import dataclasses
+import socket
+import urllib.request
+import webbrowser
+from tkinter import ttk
+
+from version import APP_VERSION
+
+FEEDBACK_WORDS = {"ko": "의견 보내기", "en": "Send feedback", "ja": "ご意見を送る", "zh-CN": "发送反馈"}
+
+
+@pytest.fixture
+def no_network(monkeypatch):
+    """Every way out to the network is counted and refused; the test asserts the count is 0."""
+    calls = []
+
+    def refuse(name):
+        def f(*args, **kwargs):
+            calls.append((name, args[1:2] if name.startswith("socket.") else args[:1]))
+            raise OSError(f"blocked by test: {name}")
+        return f
+
+    monkeypatch.setattr(socket.socket, "connect", refuse("socket.connect"))
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse("socket.connect_ex"))
+    monkeypatch.setattr(socket, "create_connection", refuse("create_connection"))
+    monkeypatch.setattr(socket, "getaddrinfo", refuse("getaddrinfo"))
+    monkeypatch.setattr(urllib.request, "urlopen", refuse("urlopen"))
+    return calls
+
+
+def opener(monkeypatch, result=True, exc=None):
+    opened = []
+
+    def fake(url, *args, **kwargs):
+        opened.append(url)
+        if exc is not None:
+            raise exc
+        return result
+
+    monkeypatch.setattr(gui.webbrowser, "open", fake)
+    return opened
+
+
+def app_state(app, root):
+    root.update()
+    return (app.source, app.dest, id(app.plan), app.plan_serial, app.serial, app.busy, app.band_kind,
+            i18n.current_lang(), root.title(), len(app.update_area.winfo_children()),
+            dataclasses.asdict(app.prefs), app.feedback_btn.cget("text"), str(app.feedback_btn.cget("state")))
+
+
+def test_feedback_opens_the_page_once_with_the_right_address(app, root, sample_folder, monkeypatch, no_network):
+    opened = opener(monkeypatch)
+    load(app, sample_folder)
+    before = app_state(app, root)
+    app.feedback_btn.invoke()
+    root.update()
+    assert opened == [f"https://chaekgalpi.co.kr/en/tools/photoorganizer?utm_source=app&utm_medium=feedback"
+                      f"&v={APP_VERSION}#feedback"]
+    assert opened == [uc_mod.feedback_url("photoorganizer", APP_VERSION, "en")]
+    assert app.feedback_win is None  # the browser opened: no address window
+    assert app_state(app, root) == before
+    assert no_network == []
+
+
+def test_feedback_follows_a_language_change_while_running(app, root, sample_folder, monkeypatch, no_network):
+    opened = opener(monkeypatch)
+    load(app, sample_folder)
+    for lang in ("ko", "ja", "zh-CN", "en", "ko"):
+        app.lang_box.set(i18n.LANG_NAMES[lang])
+        app._on_lang()
+        root.update()
+        assert app.feedback_btn.cget("text") == FEEDBACK_WORDS[lang]  # the label follows the language
+        # the flat Toolbutton style has its own small font in sv_ttk: it must get the body font
+        assert ttk.Style(root).lookup(app.feedback_btn.cget("style"), "font") == ttk.Style(root).lookup("TButton", "font")
+        app.feedback_btn.invoke()
+    page = "https://chaekgalpi.co.kr/{}tools/photoorganizer?utm_source=app&utm_medium=feedback&v=" + APP_VERSION + "#feedback"
+    assert opened == [page.format(""), page.format("en/"), page.format("en/"), page.format("en/"), page.format("")]
+    assert no_network == []
+
+
+@pytest.mark.parametrize("failure", ["false", "none", "webbrowser.Error", "OSError", "RuntimeError"])
+def test_no_browser_shows_the_address_and_changes_nothing(app, root, sample_folder, monkeypatch, no_network, failure):
+    exc = {"webbrowser.Error": webbrowser.Error("no runnable browser"), "OSError": OSError(2, "not found"),
+           "RuntimeError": RuntimeError("odd")}.get(failure)
+    opened = opener(monkeypatch, result=None if failure == "none" else False, exc=exc)
+    load(app, sample_folder)
+    app._on_update_result(fake_info(), True)  # an update notice is up: it must stay
+    before = app_state(app, root)
+    app.feedback_btn.invoke()  # no exception escapes
+    root.update()
+    url = uc_mod.feedback_url("photoorganizer", APP_VERSION, "en")
+    assert opened == [url]
+    win = app.feedback_win
+    assert win is not None and win.winfo_exists()
+    assert app.feedback_entry.get() == url and str(app.feedback_entry.cget("state")) == "readonly"
+    assert app.feedback_entry.selection_present()  # selected, ready for Ctrl+C
+    texts = [w.cget("text") for w in _all_widgets(win) if w.winfo_class() in ("TLabel", "TButton")]
+    assert i18n.t("feedback_failed") in texts and i18n.t("btn_copy") in texts and i18n.t("btn_close") in texts
+    assert app_state(app, root) == before  # the main window is as it was, the notice included
+    # [Copy] puts the address on the clipboard (faked here: tests do not touch the real clipboard)
+    clip = []
+    win.clipboard_clear = lambda: clip.append("clear")
+    win.clipboard_append = lambda s: clip.append(s)
+    copy_btn = next(w for w in _all_widgets(win) if w.winfo_class() == "TButton" and w.cget("text") == i18n.t("btn_copy"))
+    copy_btn.invoke()
+    assert clip == ["clear", url] and copy_btn.cget("text") == i18n.t("btn_copied")
+    # a second failed click replaces the window instead of piling them up
+    app.feedback_btn.invoke()
+    root.update()
+    assert not win.winfo_exists() and app.feedback_win.winfo_exists()
+    tops = [w for w in root.winfo_children() if isinstance(w, tk.Toplevel) and w.winfo_exists()]
+    assert tops == [app.feedback_win]
+    close = next(w for w in _all_widgets(app.feedback_win) if w.winfo_class() == "TButton"
+                 and w.cget("text") == i18n.t("btn_close"))
+    close.invoke()
+    root.update()
+    assert not app.feedback_win.winfo_exists()
+    assert app_state(app, root) == before
+    assert len(opened) == 2 and no_network == []
+
+
+@pytest.mark.parametrize("lang", ["en", "ko", "zh-CN", "ja"])
+def test_address_window_text_fits_in_every_language(app, root, monkeypatch, lang):
+    opener(monkeypatch, result=False)
+    i18n.set_lang(lang, persist=False)
+    app._build()
+    app.send_feedback()
+    win = app.feedback_win
+    root.update()
+    assert win.title() == FEEDBACK_WORDS[lang]
+    bad = [str(w) for w in _all_widgets(win) if w.winfo_class() in ("TLabel", "TButton", "TEntry")
+           and not fully_visible(w, win)]
+    assert bad == [], (lang, bad)
+    win.destroy()
+
+
+def test_feedback_does_not_touch_the_update_check(app, root, sample_folder, monkeypatch, no_network):
+    """The menu sends nothing and records nothing; the update check's day, skipped version
+    and switch are as they were, and a notice that arrives afterwards still shows."""
+    opener(monkeypatch)
+    started = []
+    monkeypatch.setattr(uc_mod, "check_async", lambda *a, **k: started.append(a) or True)
+    load(app, sample_folder)
+    p = dataclasses.asdict(app.prefs)
+    app.send_feedback()
+    app.send_feedback()
+    assert started == [] and dataclasses.asdict(app.prefs) == p
+    app._on_update_result(fake_info(), True)
+    root.update()
+    assert app.update_area.winfo_children()
+    assert no_network == []
+
+
+def test_the_real_browser_guard_is_on():
+    """conftest swaps webbrowser.open for every test: a forgotten fake fails, never opens a browser."""
+    import conftest
+
+    assert webbrowser.open is conftest._no_browser and gui.webbrowser.open is conftest._no_browser

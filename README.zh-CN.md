@@ -126,6 +126,10 @@ python main.py D:\照片 --undo
 - 不直接删除文件。重复文件移到 `_重复` 文件夹（可在设置中改为回收站）。
 - 不会自动下载或替换新版本。检查新版本只发送工具名和版本，可以在设置中关闭。
 
+## 反馈
+
+问题、不便之处或想要的功能，可以按窗口上方的 **发送反馈**，或在[工具页面的反馈栏](https://chaekgalpi.co.kr/en/tools/photoorganizer#feedback)（英文页面）提交，无需登录。**发送反馈** 只是在浏览器中打开该页面，程序本身不发送任何内容。也欢迎使用 [GitHub Issues](https://github.com/microhan1/photo-organizer/issues)。
+
 ## 系列
 
 - 书签工具：[音乐文件夹整理](https://github.com/microhan1/music-folder-organizer) · [音乐信息填充](https://github.com/microhan1/music-tag-filler)

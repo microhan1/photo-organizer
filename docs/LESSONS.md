@@ -117,6 +117,12 @@
 - 해결: `plan._in_place_already` — 파일이 이미 대상 폴더에 "맞춘 줄기" 또는 "줄기 (n)" 이름으로 있으면 카운터와 상관없이 그 자리가 제자리
 - 재발 방지: `tests/test_long_names.py`(줄기 60·150·200·240자, 깊은 대상 폴더, 이름 바꾸기+변환, 같은 긴 이름 5,000개), 변이 시험. 규칙 — **성능 최적화(카운터·캐시)가 "제자리 파일" 판정 앞에 서면 안 된다. 제자리 판정은 최적화보다 먼저, 원래 이름으로 한다.** 음악 툴의 점검 결과를 옮길 때는 "같은 결함이 없다"를 코드만 보고 결론 내지 말고 시험으로 확인한다(이번에 시험을 쓰자마자 나옴)
 
+### A18. (2026-10-26) 「의견 보내기」 버튼 글자가 다른 글자의 반쯤으로 작게 나옴
+- 증상: 머리줄의 납작한 버튼(`style="Toolbutton"`)만 글자가 아주 작음. 배치 시험(`fully_visible`)은 통과 — 작으면 더 잘 들어가니까
+- 원인: `_fonts()`가 본문 글꼴을 `TButton`·`TLabel` 등에만 주고, sv_ttk의 `Toolbutton`은 별도 스타일이라 테마 기본(작은) 글꼴을 씀
+- 해결: `_fonts()`의 스타일 목록에 `Toolbutton` 추가. 시험 `test_feedback_follows_a_language_change_while_running`이 `Toolbutton`과 `TButton`의 글꼴이 같은지 확인
+- 재발 방지: **새 ttk 스타일을 쓰면 `_fonts()` 목록에 넣는다.** 배치 시험은 "작아서 들어가는" 것을 못 잡으니 캡처를 직접 연다(검증 순서 2번이 잡음)
+
 ### 점검 결과 (2026-10-07)
 - 무작위 시나리오 1,600개(시드 0~399 × 정리 위치 4곳 × 무작위 옵션·언어) 전부 통과: 내용 보존, 계획 경로 유일, 재실행 조용함, 되돌리기 동일. 손으로 설계한 시나리오 60개, GUI 시나리오 추가. 변이 시험 24/24
 - 한 번 보인 뒤 재현되지 않은 것: 시드 40(정리 위치 "above")에서 되돌리기 끝의 기록 저장이 실패(`log_unsaved`)했음. 그 실행은 경로 길이에 따라 다른 폴더를 만드는 시험기 결함 때문에 같은 시드를 다시 만들 수 없었고, 고친 시험기에서는 1,600개 어디서도 나오지 않음. 원인은 모름(백신·인덱서가 `.part`를 잠깐 잡았을 가능성). 화면에는 경고로 나오고 되돌린 파일은 그대로이므로, 다시 나타나면 `save_log`의 `os.replace`를 짧게 재시도하는 것을 검토
@@ -165,3 +171,5 @@
 - D17. (2026-10-14, 메인 프로젝트 보충) 새 버전 확인의 작업 스레드가 `root.after(0, lambda: on_result(...))`로 결과를 넘기면 스레드 클로저가 App·콜백을 쥔다. 응답을 기다리는 동안 창을 닫으면 스레드가 App의 마지막 참조를 갖게 되어 tk 변수가 다른 스레드에서 해제되고 `Tcl_AsyncDelete: async handler deleted by the wrong thread`로 프로세스가 죽는다(scan-pdf-split에서 재현). → 스레드는 결과를 dict에만 담고 Tk 쪽이 `after(100, poll)`로 가져간다(`update_check.POLL_MS`). 회귀 시험: 스레드 클로저에 root·콜백이 없음(`test_the_thread_holds_no_tk_object`), 요청 중 창 닫기 3회 생존(`test_closing_the_window_while_the_request_is_out_survives`). 규칙 — **작업 스레드는 Tk 객체(root·위젯·콜백)를 쥐지 않는다. 결과는 상자에 두고 Tk 쪽이 가져간다**
 - D18. (2026-10-15, 메인 프로젝트 지시서) **시험이 운영 서버를 쳤다**: 책갈피 운영 통계에 사진 정리의 새 버전 확인이 10/13~14 이틀간 511건(다른 도구 4~29건). 원인 — GUI 시험의 `app` 픽스처가 만드는 모든 `App`이 실제 `check_async`를 부르고, `isolated_settings`가 시험마다 새 설정을 주어 `update_check_last`가 비어 날짜 가드가 늘 열려 있었다. 1.5초 넘게 이벤트 루프를 돌리는 시험마다 실제 요청이 나갔다(막고 세어 보니 **전체 pytest 1회에 51건**, 전부 `test_gui.py`; 변이 시험은 31회 pytest). 단위 시험만 `fetcher=`로 막았고 GUI 경로엔 차단이 없었다 → `tests/conftest.py` autouse `no_real_update_check`: `check_async.__kwdefaults__["fetcher"]`를 None 반환 가짜로, `fetch.__kwdefaults__["opener"]`와 `urllib.request.urlopen`을 "chaekgalpi.co.kr면 기록 + URLError"로 바꾸고 teardown에서 기록이 있으면 실패. `tests/shots.py`도 App 전에 같은 차단. (D14대로 모듈 속성이 아니라 **기본 인자 자체**를 바꿔야 효과가 있다.) 규칙 — **바깥으로 나가는 호출을 넣으면, 그 호출을 부르는 모든 진입점(GUI 픽스처·캡처·변이 시험)을 conftest 한 곳에서 막고, 막은 상태에서 세어 0건임을 확인한 뒤에야 시험을 돌린다. 릴리스 점검의 exe 1회 실행만 실제 요청이다**
 - D4. 성능 시험 데이터가 모든 파일을 같은 크기로 만들어 "완전 중복 찾기 9.5초(중복 0개)"로 보임 → 실제 원인(파일 열기 비용 약 1ms/개)은 맞았지만, 측정 데이터가 현실과 다르다는 점을 같이 적어 둔다. 스캔에서 한 번 열 때 앞 64KB 해시를 만들어 두어 해결(9.5초 → 0.008초)
+- D19. (2026-10-26, 의견 보내기) 새 화면 시험을 처음 돌렸더니 10분 넘게 끝나지 않아 멈춘 줄 알았음. `-o faulthandler_timeout=90`로 스택을 떠 보니 주 스레드가 `load()`의 `root.update()` 안(네이티브)에 있었고, 같은 시각 **다른 세션들이 같은 지시서로 pytest 10여 개를 동시에 돌려 CPU 91%(22코어)**. 기존 시험(`test_filter_views`)만 돌려도 2분 넘게 걸려 내 코드 문제가 아님을 확인 → 화면 시험이 느리면 ① `faulthandler_timeout`으로 어디서 서 있는지 보고 ② 바뀌지 않은 기존 시험 하나로 기준을 재고 ③ `Get-CimInstance Win32_Process`로 다른 pytest를 센다. 남의 세션 프로세스는 끄지 않는다. 같은 날 `test_gui.py`에 한글이 든 시험을 bash heredoc으로 덧붙임(전역 규칙 3절 위반) — grep으로 글자가 그대로인 것은 확인했지만, 앞으로 한글이 든 코드는 Edit/Write 도구로
+- 의견 보내기도 바깥(브라우저)으로 나가는 호출이라 D18 규칙을 따름: conftest autouse `no_real_browser`가 모든 시험에서 `webbrowser.open/open_new/open_new_tab`을 "기록 + False"로 바꾸고, 기록이 남으면 시험 실패(가짜를 깜빡한 시험이 실제 브라우저를 열지 못함). 캡처 하네스도 `webbrowser.open`과 `urlopen`을 막고 끝에 0건을 찍음

@@ -126,6 +126,10 @@ python main.py D:\写真 --undo
 - ファイルをすぐには削除しません。重複は `_重複` フォルダーへ（設定でごみ箱も選べます）。
 - 新しいバージョンを自動でダウンロードしたり置き換えたりしません。新しいバージョンの確認はツール名とバージョンだけを送り、設定でオフにできます。
 
+## ご意見
+
+不具合・使いにくい点・ほしい機能は、ウィンドウ上部の **ご意見を送る** を押すか、[ツールページのご意見欄](https://chaekgalpi.co.kr/en/tools/photoorganizer#feedback)（英語ページ）からログインなしで送れます。**ご意見を送る** はブラウザーでそのページを開くだけで、プログラム自身は何も送りません。[GitHub Issues](https://github.com/microhan1/photo-organizer/issues) でも受け付けています。
+
 ## シリーズ
 
 - しおりツール: [音楽フォルダ整理](https://github.com/microhan1/music-folder-organizer) · [音楽情報を埋める](https://github.com/microhan1/music-tag-filler)

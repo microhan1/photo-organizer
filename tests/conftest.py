@@ -49,6 +49,27 @@ def no_real_update_check(monkeypatch):
     assert not _blocked, f"a test tried to reach the real tools server: {_blocked}"
 
 
+_browser: list[str] = []  # pages a test tried to open in the real browser
+
+
+def _no_browser(url, *args, **kwargs):
+    _browser.append(url)
+    return False
+
+
+@pytest.fixture(autouse=True)
+def no_real_browser(monkeypatch):
+    """"Send feedback" and [Update] open a browser: a test that does not fake webbrowser.open
+    itself gets this one, which opens nothing and fails the test."""
+    import webbrowser
+
+    for name in ("open", "open_new", "open_new_tab"):
+        monkeypatch.setattr(webbrowser, name, _no_browser)
+    _browser.clear()
+    yield
+    assert not _browser, f"a test tried to open the real browser: {_browser}"
+
+
 @pytest.fixture(autouse=True)
 def isolated_settings(tmp_path_factory, monkeypatch):
     """Every test gets its own settings.json (outside the folders it snapshots) and English strings."""

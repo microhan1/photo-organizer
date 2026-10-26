@@ -126,6 +126,10 @@ When a newer version exists, a one-line notice appears at the bottom of the wind
 - It never deletes a file straight away. Duplicates go to `_Duplicates` (or the Recycle Bin, if you choose so in Settings).
 - It does not download or replace a new version by itself. The update check sends only the tool's name and version and can be turned off.
 
+## Feedback
+
+Tell us what's broken, awkward or missing with **Send feedback** at the top of the window, or in the [feedback box on the tool's page](https://chaekgalpi.co.kr/en/tools/photoorganizer#feedback) — no sign-in needed. **Send feedback** only opens that page in your browser; the app itself sends nothing. [GitHub Issues](https://github.com/microhan1/photo-organizer/issues) are welcome too.
+
 ## Series
 
 - Chaekgalpi Tools: [Music Folder Organizer](https://github.com/microhan1/music-folder-organizer) · [Music Tag Filler](https://github.com/microhan1/music-tag-filler)
