@@ -31,9 +31,15 @@ def test_the_exact_address_for_each_language(lang, expected):
     assert uc.feedback_url(SLUG, "0.2.1", lang) == expected.format(v="0.2.1")
 
 
-@pytest.mark.parametrize("lang", [None, "", "  ", "fr", "de", "ko-KR", "xx", "zh-TW", "english"])
-def test_unknown_or_missing_language_gets_the_korean_page(lang):
-    assert uc.feedback_url(SLUG, "0.2.1", lang) == KO.format(v="0.2.1")
+@pytest.mark.parametrize("lang", [None, "", "  ", "fr", "de", "xx", "zh-TW", "english"])
+def test_unknown_or_missing_language_gets_the_english_page(lang):
+    """Series rule of 2026-10-27: only ko... is Korean; no language is the default (en).
+    Until v0.1.5 these got the Korean page (test_feedback_access.py has the full rule)."""
+    assert uc.feedback_url(SLUG, "0.2.1", lang) == EN.format(v="0.2.1")
+
+
+def test_korean_region_codes_get_the_korean_page():
+    assert uc.feedback_url(SLUG, "0.2.1", "ko-KR") == KO.format(v="0.2.1")
 
 
 @pytest.mark.parametrize("lang", ["EN", "En", " en ", "JA", "zh-cn", "ZH-CN", "zh_CN", "KO", "Ko"])

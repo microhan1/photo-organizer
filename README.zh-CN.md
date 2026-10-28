@@ -133,7 +133,7 @@ python main.py D:\照片 --undo
 ## 系列
 
 - 书签工具：[音乐文件夹整理](https://github.com/microhan1/music-folder-organizer) · [音乐信息填充](https://github.com/microhan1/music-tag-filler)
-- [书签图书馆（Chaekgalpi Library）](https://chaekgalpi.co.kr/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — 记录读过的书和读书笔记的网页服务（仅韩语）
+- [书签图书馆（Chaekgalpi Library）](https://chaekgalpi.co.kr/en/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — 记录读过的书和读书笔记的网页服务（仅韩语）
 
 ## 许可证
 

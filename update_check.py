@@ -19,6 +19,8 @@ import urllib.parse
 import urllib.request
 from typing import Callable
 
+import i18n
+
 API = "https://chaekgalpi.co.kr/api/tools/{slug}/latest"
 SITE = "https://chaekgalpi.co.kr/"  # the notice only ever opens a page on this site
 TIMEOUT = 4.0
@@ -35,26 +37,36 @@ class UpdateInfo:
     url_en: str = ""  # the English tools page (server `urlEn`), only when it is on the tools site
 
 
-def page_url(info: UpdateInfo, lang: str) -> str:
-    """The page [Update] opens: the Korean page for a Korean screen, the English page for
-    every other language when the server gave one, otherwise the Korean page."""
-    if lang != "ko" and info.url_en:
+def is_korean(lang: str | None) -> bool:
+    """Which tools page a screen language gets, one rule across the series (2026-10-27)
+    for both [Update] and "Send feedback": a code whose first part is "ko" (ko, ko-KR,
+    ko_KR) gets the Korean page; every other code - en, ja, zh-CN, zh-TW, fr, one the
+    program does not know - the English page (the site has no Japanese or Chinese page).
+    No language at all is this program's default screen language (i18n.DEFAULT_LANG)."""
+    code = lang.strip() if isinstance(lang, str) else ""
+    code = code or i18n.DEFAULT_LANG
+    return code.replace("_", "-").split("-")[0].lower() == "ko"
+
+
+def page_url(info: UpdateInfo, lang: str | None) -> str:
+    """The page [Update] opens: the Korean page for a Korean screen (is_korean), the
+    English page for every other language when the server gave one, otherwise the
+    Korean page."""
+    if not is_korean(lang) and info.url_en:
         return info.url_en
     return info.url
 
 
 FEEDBACK = "https://chaekgalpi.co.kr/tools/{slug}"
 FEEDBACK_EN = "https://chaekgalpi.co.kr/en/tools/{slug}"  # the site has no Japanese or Chinese page
-FEEDBACK_EN_LANGS = ("en", "ja", "zh-cn")
 
 
 def feedback_url(slug: str, version: str | None, lang: str | None) -> str:
     """The tools page's feedback box, opened in the browser by "Send feedback". Built from
-    constants only; the program sends nothing itself. Korean for ko and any unknown
-    language; the English page for en, ja and zh-CN. `v` is left out when there is no
-    version. #feedback scrolls the page down to the box."""
-    code = (lang or "").strip().lower().replace("_", "-")
-    base = (FEEDBACK_EN if code in FEEDBACK_EN_LANGS else FEEDBACK).format(slug=slug)
+    constants only; the program sends nothing itself. The language picks the page as in
+    is_korean(). `v` is left out when there is no version. #feedback scrolls the page
+    down to the box."""
+    base = (FEEDBACK if is_korean(lang) else FEEDBACK_EN).format(slug=slug)
     query = "utm_source=app&utm_medium=feedback"
     if version and version.strip():
         query += "&v=" + urllib.parse.quote(version, safe="")

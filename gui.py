@@ -315,6 +315,151 @@ class Thumbs:
             self.post("thumb", (path, pil))
 
 
+def screen_area(widget: tk.Misc) -> tuple[int, int, int, int]:
+    """(left, top, right, bottom) of the work area (taskbar left out) of the monitor the
+    widget is on. A second monitor can sit left of or above the main one, at negative
+    coordinates, so 0 is not always the edge. Without the Windows call: Tk's main screen."""
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            import ctypes.wintypes as wt
+
+            class MonitorInfo(ctypes.Structure):
+                _fields_ = [("cbSize", wt.DWORD), ("rcMonitor", wt.RECT), ("rcWork", wt.RECT), ("dwFlags", wt.DWORD)]
+
+            user32 = ctypes.windll.user32
+            user32.MonitorFromPoint.restype = wt.HANDLE
+            user32.MonitorFromPoint.argtypes = [wt.POINT, wt.DWORD]
+            user32.GetMonitorInfoW.argtypes = [wt.HANDLE, ctypes.POINTER(MonitorInfo)]
+            point = wt.POINT(widget.winfo_rootx() + widget.winfo_width() // 2,
+                             widget.winfo_rooty() + widget.winfo_height() // 2)
+            monitor = user32.MonitorFromPoint(point, 2)  # MONITOR_DEFAULTTONEAREST
+            info = MonitorInfo()
+            info.cbSize = ctypes.sizeof(MonitorInfo)
+            if monitor and user32.GetMonitorInfoW(monitor, ctypes.byref(info)):
+                work = info.rcWork
+                return work.left, work.top, work.right, work.bottom
+        except Exception:
+            pass
+    return 0, 0, widget.winfo_screenwidth(), widget.winfo_screenheight()
+
+
+def tip_position(widget: tuple[int, int, int, int], tip: tuple[int, int], area: tuple[int, int, int, int],
+                 window: tuple[int, int] | None = None) -> tuple[int, int]:
+    """Top-left corner of a tooltip for widget (x, y, w, h) on screen: under it, right edges
+    lined up (the button sits at the window's right side and the note is wider), kept
+    inside the window's (left, right) when it fits there, then inside the monitor's work
+    area `area` - above the widget when there is no room below. The monitor wins."""
+    x0, y0, w, h = widget
+    tw, th = tip
+    left, top, right, bottom = area
+    x = x0 + w - tw
+    if window is not None and tw <= window[1] - window[0]:
+        x = max(window[0], min(x, window[1] - tw))
+    x = max(left, min(x, right - tw))
+    y = y0 + h + px(4)
+    if y + th > bottom:
+        y = y0 - px(4) - th
+    return x, max(top, y)
+
+
+class Tooltip:
+    """A small note under a widget while the mouse rests on it (plain tkinter). The words
+    are looked up on every show, so they follow a language switch; the note belongs to
+    the main window, so a rebuild of the widgets can hand it the new widget (attach)."""
+
+    DELAY_MS = 450
+
+    def __init__(self, root: tk.Misc, key: str, colors) -> None:
+        self.root, self.key, self.colors = root, key, colors  # colors: () -> the current palette
+        self.widget: tk.Misc | None = None
+        self.tip: tk.Toplevel | None = None
+        self.label: tk.Label | None = None
+        self._job = None
+
+    @property
+    def text(self) -> str:
+        return t(self.key)
+
+    def attach(self, widget: tk.Misc) -> None:
+        """Follow `widget` from now on; a note showing for the old one moves to it."""
+        self._cancel()
+        self.widget = widget
+        widget.bind("<Enter>", lambda e: self._schedule(), add="+")
+        for seq in ("<Leave>", "<ButtonPress>"):
+            widget.bind(seq, lambda e: self.hide(), add="+")
+        widget.bind("<Destroy>", lambda e, w=widget: self._gone(w), add="+")
+        if self.tip is not None:
+            self.root.after_idle(self.refresh)  # once the rebuilt window is laid out
+
+    def detach(self) -> None:
+        """The widgets are about to be rebuilt (language, theme): a note that is showing
+        stays and moves to the new widget in attach()."""
+        self._cancel()
+        self.widget = None
+
+    def _gone(self, widget) -> None:
+        if self.widget is widget:  # destroyed for good, not rebuilt
+            self.hide()
+
+    def _schedule(self) -> None:
+        self._cancel()
+        self._job = self.root.after(self.DELAY_MS, self.show)
+
+    def _cancel(self) -> None:
+        if self._job is not None:
+            try:
+                self.root.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+
+    def showing(self) -> bool:
+        return self.tip is not None
+
+    def show(self) -> None:
+        self._job = None
+        w = self.widget
+        try:
+            if w is None or not w.winfo_exists():
+                return
+            w.update_idletasks()
+            if not w.winfo_ismapped():
+                return
+            c = self.colors()
+            if self.tip is None:
+                self.tip = tk.Toplevel(self.root)
+                self.tip.wm_overrideredirect(True)
+                self.tip.wm_attributes("-topmost", True)
+                self.label = tk.Label(self.tip, justify="left", relief="flat", borderwidth=0, highlightthickness=1,
+                                      padx=px(8), pady=px(4), wraplength=px(460))
+                self.label.pack()
+            self.label.configure(text=self.text, font="TkDefaultFont", bg=c["surface"], fg=c["text"],
+                                 highlightbackground=c["muted"], highlightcolor=c["muted"])
+            self.tip.update_idletasks()
+            top = w.winfo_toplevel()
+            x, y = tip_position((w.winfo_rootx(), w.winfo_rooty(), w.winfo_width(), w.winfo_height()),
+                                (self.tip.winfo_reqwidth(), self.tip.winfo_reqheight()), screen_area(w),
+                                (top.winfo_rootx(), top.winfo_rootx() + top.winfo_width()))
+            self.tip.wm_geometry(f"+{x}+{y}")
+        except tk.TclError:  # the window is going away
+            self.hide()
+
+    def refresh(self) -> None:
+        """New words (a language switch) in the note that is showing."""
+        if self.tip is not None:
+            self.show()
+
+    def hide(self) -> None:
+        self._cancel()
+        if self.tip is not None:
+            try:
+                self.tip.destroy()
+            except tk.TclError:
+                pass
+            self.tip = self.label = None
+
+
 # ------------------------------------------------------------------ app
 @dataclasses.dataclass
 class Ui:
@@ -357,6 +502,7 @@ class App:
         self.content: ttk.Frame | None = None
         self._update_info: update_check.UpdateInfo | None = None
         self.feedback_win: tk.Toplevel | None = None  # the address window when no browser opened
+        self.tip_feedback = Tooltip(root, "tip_feedback", lambda: self.colors)  # survives every rebuild
         self._build()
         root.after(POLL_MS, self._poll)
         # once a day, 1.5 s after the window is up, on a background thread; silent on any failure.
@@ -414,6 +560,7 @@ class App:
     def _build(self) -> None:
         """(Re)create every widget; called again when the language changes."""
         if self.content is not None:
+            self.tip_feedback.detach()
             self.content.destroy()
         self._fonts()
         self.root.title(t("app_title"))
@@ -459,15 +606,22 @@ class App:
         P = px(theme.PAD)
         bar = ttk.Frame(c)
         bar.pack(side="top", fill="x")
-        # fixed-size widgets on the right first; the path label stretches into what is left
-        ttk.Button(bar, text=GEAR, width=3, command=self.open_settings).pack(side="right")
+        # created in the order they read, left to right, which is the order Tab visits them
+        # (Tk follows creation order); packed from the right, the path label stretches into what is left
+        self.feedback_btn = ttk.Button(bar, text=t("btn_feedback"), style="Toolbutton", command=self.send_feedback)
         names = [i18n.LANG_NAMES[code] for code in i18n.LANGS]
         self.lang_box = ttk.Combobox(bar, values=names, state="readonly", width=10, font=self.f_body)
         self.lang_box.set(i18n.LANG_NAMES[i18n.current_lang()])
         self.lang_box.bind("<<ComboboxSelected>>", self._on_lang)
+        self.gear_btn = ttk.Button(bar, text=GEAR, width=3, command=self.open_settings)
+        self.gear_btn.pack(side="right")
         self.lang_box.pack(side="right", padx=(0, P))
-        self.feedback_btn = ttk.Button(bar, text=t("btn_feedback"), style="Toolbutton", command=self.send_feedback)
         self.feedback_btn.pack(side="right", padx=(0, P))
+        # a Tab stop like every button (sv-ttk draws its focus frame, same size). Enter opens it
+        # as Space does, once: "break" keeps the Space class binding from invoking it again
+        for seq in ("<Return>", "<KP_Enter>", "<space>"):
+            self.feedback_btn.bind(seq, lambda e: (self.feedback_btn.invoke(), "break")[1])
+        self.tip_feedback.attach(self.feedback_btn)
         ttk.Label(bar, text=t("app_title"), style="Name.TLabel").pack(side="left")
         self.path_label = ttk.Label(bar, text=short(self.source, 80), style="Muted.TLabel")
         self.path_label.pack(side="left", fill="x", expand=True, padx=(P * 2, P))
@@ -1324,6 +1478,7 @@ class App:
     def send_feedback(self) -> None:
         """Open the feedback box on the tools page in the browser; the program itself sends
         nothing. When no browser opens, show the address so it can be copied."""
+        self.tip_feedback.hide()  # it would otherwise stay over the browser
         url = update_check.feedback_url(UPDATE_SLUG, APP_VERSION, i18n.current_lang())
         try:
             opened = webbrowser.open(url)

@@ -20,6 +20,8 @@ import update_check as _uc  # noqa: E402
 # fetch() binds opener=urlopen and check_async() binds fetcher=fetch at definition time
 # (LESSONS D14), so the defaults themselves are replaced, not the module attributes.
 _blocked: list[str] = []  # requests the program tried to send during the current test
+# every refused attempt of the whole run (urlopen and sockets), printed at the end
+NETWORK_ATTEMPTS: list[tuple[str, str]] = []
 
 
 def _no_fetch(slug, version):
@@ -28,17 +30,16 @@ def _no_fetch(slug, version):
 
 
 def _no_network(req, timeout=None):
-    """Second line of defence: any opener call for the tools site fails the test."""
+    """Second line of defence: any opener call, to any host, fails the test."""
     import urllib.error
 
     url = req.full_url if hasattr(req, "full_url") else str(req)
-    if "chaekgalpi.co.kr" in url:
-        _blocked.append(url)
+    _blocked.append(url)  # any host, not only the tools site
     raise urllib.error.URLError("blocked by tests/conftest.py: tests never reach the real server")
 
 
 @pytest.fixture(autouse=True)
-def no_real_update_check(monkeypatch):
+def no_real_update_check(monkeypatch, request):
     import urllib.request
 
     monkeypatch.setitem(_uc.check_async.__kwdefaults__, "fetcher", _no_fetch)
@@ -46,7 +47,40 @@ def no_real_update_check(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", _no_network)
     _blocked.clear()
     yield
-    assert not _blocked, f"a test tried to reach the real tools server: {_blocked}"
+    NETWORK_ATTEMPTS.extend((request.node.nodeid, f"urlopen {u}") for u in _blocked)
+    assert not _blocked, f"a test tried to reach the network: {_blocked}"
+
+
+# ---- Third line (2026-10-28, "의견 보내기" follow-up): no socket leaves this process in any
+# test, whatever the host. Every attempt is refused, counted for the whole run and printed
+# at the end ("network attempts: 0"); a test that made one fails.
+
+
+@pytest.fixture(autouse=True)
+def no_sockets(monkeypatch, request):
+    import socket
+
+    mine: list[str] = []
+
+    def refuse(name):
+        def blocked(*args, **kwargs):
+            where = repr(args[1] if name.startswith("socket.") and len(args) > 1 else args[:1])
+            mine.append(f"{name} {where}")
+            NETWORK_ATTEMPTS.append((request.node.nodeid, f"{name} {where}"))
+            raise OSError(f"blocked by tests/conftest.py: no network in tests ({name})")
+        return blocked
+
+    monkeypatch.setattr(socket.socket, "connect", refuse("socket.connect"))
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse("socket.connect_ex"))
+    monkeypatch.setattr(socket, "create_connection", refuse("create_connection"))
+    monkeypatch.setattr(socket, "getaddrinfo", refuse("getaddrinfo"))
+    yield mine
+    assert not mine, f"a test tried to open a network connection: {mine}"
+
+
+def pytest_terminal_summary(terminalreporter):
+    terminalreporter.write_line(f"network attempts: {len(NETWORK_ATTEMPTS)}"
+                                + (f" {NETWORK_ATTEMPTS}" if NETWORK_ATTEMPTS else ""))
 
 
 _browser: list[str] = []  # pages a test tried to open in the real browser

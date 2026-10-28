@@ -133,7 +133,7 @@ python main.py D:\写真 --undo
 ## シリーズ
 
 - しおりツール: [音楽フォルダ整理](https://github.com/microhan1/music-folder-organizer) · [音楽情報を埋める](https://github.com/microhan1/music-tag-filler)
-- [しおりライブラリ（Chaekgalpi Library）](https://chaekgalpi.co.kr/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — 読んだ本と読書記録を残すウェブサービス（韓国語のみ）
+- [しおりライブラリ（Chaekgalpi Library）](https://chaekgalpi.co.kr/en/tools/photoorganizer?utm_source=github&utm_medium=referral&utm_campaign=tool_cta&utm_content=photoorganizer) — 読んだ本と読書記録を残すウェブサービス（韓国語のみ）
 
 ## ライセンス
 

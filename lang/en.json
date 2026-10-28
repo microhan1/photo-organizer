@@ -77,6 +77,7 @@
   "btn_update": "Update",
   "btn_later": "Later",
   "btn_feedback": "Send feedback",
+  "tip_feedback": "Tell us what's broken or missing (opens your browser)",
   "feedback_failed": "Could not open a browser. Copy the address below and paste it into your browser to reach the feedback form (no sign-in needed).",
   "btn_copy": "Copy address",
   "btn_copied": "Copied",
